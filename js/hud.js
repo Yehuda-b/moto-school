@@ -9,9 +9,11 @@ export class HUD {
       hud: $('hud'), num: $('lp-num'), title: $('lp-title'), steps: $('lp-steps'), score: $('lp-score'), time: $('lp-time'),
       gear: $('d-gear'), speed: $('d-speed'), rpm: $('d-rpm'),
       left: $('i-left'), right: $('i-right'), engine: $('i-engine'), neutral: $('i-neutral'), clutch: $('i-clutch'),
-      toasts: $('toasts'), keys: $('keys-hint'), panel: $('lesson-panel'),
+      toasts: $('toasts'), keys: $('keys-hint'), panel: $('lesson-panel'), fps: $('fps'),
     };
     this.minimap = $('minimap');
+    this.minimapOn = true;
+    this.fpsOn = false;
     this.mctx = this.minimap.getContext('2d');
     this.mapImg = this.drawStaticMap(world);
     this.lastSteps = '';
@@ -70,7 +72,7 @@ export class HUD {
       e.time.textContent = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
       this.renderSteps(session);
     }
-    this.drawMinimap(bike, session);
+    if (this.minimapOn) this.drawMinimap(bike, session);
   }
 
   toast(text, kind = 'info', ms = 2600, big = false) {
@@ -90,6 +92,31 @@ export class HUD {
   }
 
   toggleKeys() { this.el.keys.classList.toggle('hidden'); }
+  setKeys(on) { this.el.keys.classList.toggle('hidden', !on); }
+
+  setMinimap(on) {
+    this.minimapOn = on;
+    this.minimap.classList.toggle('hidden', !on);
+  }
+
+  setFps(on) {
+    this.fpsOn = on;
+    this.el.fps.classList.toggle('hidden', !on);
+    this.fpsT = 0;
+    this.fpsN = 0;
+  }
+
+  /** Frame counter, averaged over half a second. */
+  tickFps(dt) {
+    if (!this.fpsOn) return;
+    this.fpsT += dt;
+    this.fpsN++;
+    if (this.fpsT >= 0.5) {
+      this.el.fps.textContent = `${Math.round(this.fpsN / this.fpsT)} FPS`;
+      this.fpsT = 0;
+      this.fpsN = 0;
+    }
+  }
 
   // ---------- minimap ----------
   drawStaticMap(world) {

@@ -6,7 +6,7 @@
   <title>בית ספר לרכיבה</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;800&family=Orbitron:wght@500;700;900&family=Rubik:wght@500;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
   <script type="importmap">
     {
@@ -35,6 +35,7 @@
     </div>
 
     <canvas id="minimap" width="180" height="180"></canvas>
+    <div id="fps" class="hidden"></div>
 
     <div id="toasts"></div>
 
@@ -91,70 +92,146 @@
     </div>
   </div>
 
+  <!-- Synthwave floor behind the title / main menu -->
+  <div id="menu-bg" class="hidden"><div class="grid-floor"></div></div>
+
+  <!-- Title screen -->
+  <div id="splash" class="screen overlay hidden">
+    <div class="splash-wrap">
+      <div class="kicker">MOTO SCHOOL</div>
+      <h1 class="logo flicker">בית ספר לרכיבה</h1>
+      <p class="logo-sub">לומדים לרכוב על אופנוע — צעד אחר צעד, במגרש ובכביש</p>
+      <div class="press">לחצו על מקש כלשהו</div>
+      <div class="press-en">PRESS ANY KEY</div>
+    </div>
+  </div>
+
   <!-- Main menu -->
-  <div id="menu" class="overlay">
-    <div class="panel wide">
-      <div class="brand">
-        <div class="logo">🏍️</div>
-        <div>
-          <h1>בית ספר לרכיבה</h1>
-          <p class="sub">לומדים לרכוב על אופנוע — צעד אחר צעד, במגרש ובכביש</p>
-        </div>
+  <div id="menu" class="screen overlay hidden">
+    <div class="menu-wrap">
+      <div class="logo-block">
+        <div class="kicker">MOTO SCHOOL</div>
+        <h1 class="logo">בית ספר<br>לרכיבה</h1>
       </div>
+      <nav class="menu-list">
+        <button class="mi" data-nav id="m-lessons"><span class="mi-label">שיעורים</span><small id="m-progress"></small></button>
+        <button class="mi" data-nav id="m-free"><span class="mi-label">רכיבה חופשית</span><small>בלי משימות ובלי ציונים</small></button>
+        <button class="mi" data-nav id="m-howto"><span class="mi-label">איך משחקים</span><small>מטרה, ניקוד ומקשים</small></button>
+        <button class="mi" data-nav id="m-settings"><span class="mi-label">הגדרות</span><small>גרפיקה, שמע ומשחק</small></button>
+      </nav>
+    </div>
+    <div class="version">v1.0</div>
+  </div>
+
+  <!-- Lesson select -->
+  <div id="lessons" class="screen overlay hidden">
+    <div class="screen-wrap">
+      <header class="screen-head">
+        <div><div class="kicker">SELECT LESSON</div><h2>בחירת שיעור</h2></div>
+        <div id="ls-stars" class="head-stat"></div>
+      </header>
       <div id="lesson-grid" class="lesson-grid"></div>
-      <div class="settings">
-        <label class="toggle"><input type="checkbox" id="opt-auto"> <span>תיבת הילוכים אוטומטית (למתחילים מאוד)</span></label>
-        <label class="toggle"><input type="checkbox" id="opt-sound" checked> <span>קול מנוע</span></label>
-        <label class="toggle"><span>איכות גרפיקה</span> <select id="opt-quality"></select></label>
+    </div>
+  </div>
+
+  <!-- Settings -->
+  <div id="settings" class="screen overlay hidden">
+    <div class="screen-wrap">
+      <header class="screen-head">
+        <div><div class="kicker">OPTIONS</div><h2>הגדרות</h2></div>
+      </header>
+      <div id="set-tabs" class="tabs"></div>
+      <div id="set-body" class="set-body"></div>
+      <div class="set-foot">
+        <button class="btn" data-nav id="set-defaults">שחזור ברירות מחדל</button>
+        <button class="btn" data-nav id="set-back">חזרה</button>
       </div>
     </div>
   </div>
 
+  <!-- How to play -->
+  <div id="howto" class="screen overlay hidden">
+    <div class="screen-wrap">
+      <header class="screen-head">
+        <div><div class="kicker">HOW TO PLAY</div><h2>איך משחקים</h2></div>
+      </header>
+      <div class="howto-cards">
+        <div class="hc"><b>01</b><span>בוחרים שיעור ומקשיבים לטיפים של המורה.</span></div>
+        <div class="hc"><b>02</b><span>מבצעים את המשימות שבפינת המסך, אחת אחרי השנייה.</span></div>
+        <div class="hc"><b>03</b><span>כל טעות מורידה נקודות. 85 ומעלה — שני כוכבים, 95 ומעלה — שלושה.</span></div>
+      </div>
+      <div id="howto-keys"></div>
+      <div class="btns"><button class="btn" data-nav id="howto-back">חזרה</button></div>
+    </div>
+  </div>
+
   <!-- Lesson briefing -->
-  <div id="briefing" class="overlay hidden">
+  <div id="briefing" class="screen overlay side hidden">
     <div class="panel">
+      <div class="kicker">BRIEFING</div>
       <div class="lp-head"><span id="b-num" class="badge"></span><h2 id="b-title"></h2></div>
       <div id="b-intro" class="intro"></div>
       <h3>טיפים של המורה</h3>
       <ul id="b-tips" class="tips"></ul>
       <div id="b-note" class="note hidden"></div>
       <div class="btns">
-        <button id="b-start" class="primary">יאללה, מתחילים</button>
-        <button id="b-back">חזרה לתפריט</button>
+        <button id="b-start" class="btn primary" data-nav>יאללה, מתחילים</button>
+        <button id="b-back" class="btn" data-nav>חזרה</button>
       </div>
     </div>
   </div>
 
   <!-- Pause -->
-  <div id="pause" class="overlay hidden">
-    <div class="panel narrow">
-      <h2>הפסקה</h2>
-      <div class="btns col">
-        <button id="p-resume" class="primary">המשך</button>
-        <button id="p-restart">התחל את השיעור מחדש</button>
-        <button id="p-menu">לתפריט הראשי</button>
-      </div>
+  <div id="pause" class="screen overlay hidden">
+    <div class="pause-wrap">
+      <div class="kicker">PAUSED</div>
+      <h2 class="big-title">הפסקה</h2>
+      <nav class="menu-list center">
+        <button class="mi" data-nav id="p-resume"><span class="mi-label">המשך</span></button>
+        <button class="mi" data-nav id="p-restart"><span class="mi-label">התחל את השיעור מחדש</span></button>
+        <button class="mi" data-nav id="p-settings"><span class="mi-label">הגדרות</span></button>
+        <button class="mi" data-nav id="p-menu"><span class="mi-label">לתפריט הראשי</span></button>
+      </nav>
     </div>
   </div>
 
   <!-- Result -->
-  <div id="result" class="overlay hidden">
-    <div class="panel">
+  <div id="result" class="screen overlay hidden">
+    <div class="panel result-panel">
+      <div id="r-kicker" class="kicker"></div>
       <div id="r-badge" class="r-badge"></div>
       <h2 id="r-title"></h2>
       <div id="r-stars" class="stars"></div>
       <div id="r-summary" class="r-summary"></div>
       <ul id="r-mistakes" class="mistakes"></ul>
       <div id="r-tip" class="note hidden"></div>
-      <div class="btns">
-        <button id="r-next" class="primary">לשיעור הבא</button>
-        <button id="r-retry">נסה שוב</button>
-        <button id="r-menu">לתפריט</button>
+      <div class="btns center">
+        <button id="r-next" class="btn primary" data-nav>לשיעור הבא</button>
+        <button id="r-retry" class="btn" data-nav>נסה שוב</button>
+        <button id="r-menu" class="btn" data-nav>לתפריט</button>
       </div>
     </div>
   </div>
 
-  <div id="loading" class="overlay"><div class="spinner"></div><p>טוען את המגרש...</p></div>
+  <!-- Confirm dialog -->
+  <div id="confirm" class="modal hidden">
+    <div class="panel">
+      <div class="kicker">CONFIRM</div>
+      <p id="cf-text"></p>
+      <div class="btns center">
+        <button id="cf-ok" class="btn" data-nav>אישור</button>
+        <button id="cf-cancel" class="btn" data-nav>ביטול</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="prompts" class="prompts hidden"></div>
+
+  <div id="loading" class="overlay">
+    <div class="kicker">MOTO SCHOOL</div>
+    <div class="load-bar"><i></i></div>
+    <p>טוען את המגרש...</p>
+  </div>
 
   <script type="module" src="js/main.js"></script>
 </body>

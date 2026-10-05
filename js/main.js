@@ -10,6 +10,7 @@ import { Graphics, QUALITY } from './graphics.js';
 import { NPCs } from './npc.js';
 import { Effects } from './effects.js';
 import { GrassField } from './grass.js';
+import { MenuUI, settingsTabs } from './ui.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -22,7 +23,12 @@ const store = {
     try { localStorage.setItem(key, JSON.stringify(val)); } catch { /* storage unavailable */ }
   },
 };
-const settings = { auto: false, sound: true, quality: 'high', ...store.get('moto.settings', {}) };
+const DEFAULTS = {
+  auto: false, sound: true, quality: 'high', volume: 80, uiSound: true,
+  fov: 60, shake: true, fps: false, camera: 0, minimap: true, keys: true,
+};
+const settings = { ...DEFAULTS, ...store.get('moto.settings', {}) };
+const saveSettings = () => store.set('moto.settings', settings);
 const progress = store.get('moto.progress', {});
 
 // ---------- renderer / scene ----------
@@ -35,6 +41,7 @@ const input = new Input();
 const hud = new HUD(world);
 const audio = new EngineAudio();
 audio.enabled = settings.sound;
+audio.volume = settings.volume / 100;
 const npc = new NPCs(scene, world);
 const effects = new Effects(scene);
 const grass = new GrassField(scene, world, gfx.q.grass);
@@ -52,31 +59,75 @@ const camPos = new THREE.Vector3(0, 5, -10);
 const camLook = new THREE.Vector3();
 
 // ---------- menus ----------
+const ui = new MenuUI({
+  audio, settings,
+  tabs: settingsTabs(Object.entries(QUALITY).map(([k, q]) => [k, q.label])),
+  onSetting(key, value) {
+    settings[key] = value;
+    saveSettings();
+    if (key === 'quality') location.reload();
+    else applySettings();
+  },
+  onAction(key) {
+    if (key === 'resetProgress') {
+      for (const k of Object.keys(progress)) delete progress[k];
+      store.set('moto.progress', progress);
+      buildMenu();
+    } else if (key === 'defaults') {
+      // quality needs a reload, so it keeps its current value
+      Object.assign(settings, DEFAULTS, { quality: settings.quality });
+      saveSettings();
+      applySettings();
+    }
+  },
+});
+ui.backHandlers = {
+  briefing: () => toMenu(currentDef?.free ? ['menu'] : ['menu', 'lessons']),
+  pause: () => resume(),
+  result: () => toMenu(),
+};
+
+function applySettings() {
+  audio.setEnabled(settings.sound);
+  audio.setVolume(settings.volume / 100);
+  hud.setMinimap(settings.minimap);
+  hud.setKeys(settings.keys);
+  hud.setFps(settings.fps);
+  ui.refresh();
+}
+
 function starsText(n) {
   return '★'.repeat(n) + '<span class="off">' + '★'.repeat(3 - n) + '</span>';
 }
 
+const cardFor = {};
 function buildMenu() {
   const grid = $('lesson-grid');
   grid.innerHTML = '';
-  for (const def of [...LESSONS, FREE_RIDE]) {
-    const b = document.createElement('button');
-    b.className = 'lesson-card' + (def.free ? ' free' : '');
+  let total = 0;
+  for (const def of LESSONS) {
     const best = progress[def.id];
+    total += best?.stars || 0;
+    const b = document.createElement('button');
+    b.className = 'lesson-card' + (best ? ' passed' : '');
+    b.dataset.nav = '';
     b.innerHTML = `
-      <div class="lc-top">
-        <span class="badge">${def.free ? 'חופשי' : 'שיעור ' + def.num}</span>
-        ${def.free ? '' : `<span class="lc-stars">${starsText(best?.stars || 0)}</span>`}
-      </div>
-      <div class="lc-title">${def.title}</div>
-      <div class="lc-desc">${def.desc}</div>`;
+      <span class="lc-num">${String(def.num).padStart(2, '0')}</span>
+      <span class="lc-body">
+        <span class="lc-title">${def.title}</span>
+        <span class="lc-desc">${def.desc}</span>
+      </span>
+      <span class="lc-foot">
+        <span class="lc-stars">${starsText(best?.stars || 0)}</span>
+        <span class="lc-best">${best ? `שיא <b>${best.score}</b>` : 'טרם הושלם'}</span>
+      </span>`;
     b.onclick = () => openBriefing(def);
     grid.appendChild(b);
+    cardFor[def.id] = b;
   }
-}
-
-function showOverlay(id) {
-  for (const o of ['menu', 'briefing', 'pause', 'result']) $(o).classList.toggle('hidden', o !== id);
+  const max = LESSONS.length * 3;
+  $('m-progress').textContent = `★ ${total} / ${max} כוכבים`;
+  $('ls-stars').innerHTML = `<span class="st">★</span><span>${total}</span><small>/ ${max}</small>`;
 }
 
 function openBriefing(def) {
@@ -92,9 +143,10 @@ function openBriefing(def) {
     note.textContent = 'שיעור זה מלמד עבודה עם מצמד והילוכים, ולכן ייערך עם תיבה ידנית.';
     note.classList.remove('hidden');
   } else note.classList.add('hidden');
-  showOverlay('briefing');
+  ui.show('briefing');
   // preview the starting position behind the overlay
   bike.reset(def.spawn.x, def.spawn.z, def.spawn.h, { engineOn: !!def.spawn.engineOn });
+  camMode = settings.camera;
   snapCamera();
 }
 
@@ -106,10 +158,12 @@ function startLesson(def) {
   npc.setLessonInstructor(def.instructor || null);
   hud.setLesson(def);
   hud.show(true);
-  showOverlay(null);
+  ui.show(null);
   state = 'playing';
   audio.init();
   audio.resume();
+  audio.setPaused(false);
+  camMode = settings.camera;
   snapCamera();
   if (!def.free) hud.toast(def.title, 'info', 2200, true);
 }
@@ -121,22 +175,24 @@ function isAuto() {
 function pause() {
   if (state !== 'playing') return;
   state = 'paused';
-  showOverlay('pause');
-  audio.suspend();
+  ui.show('pause');
+  audio.setPaused(true);
 }
 function resume() {
   state = 'playing';
-  showOverlay(null);
-  audio.resume();
+  ui.show(null);
+  audio.setPaused(false);
 }
-function toMenu() {
+function toMenu(stack = ['menu']) {
   session?.dispose();
   session = null;
   npc.setLessonInstructor(null);
   hud.show(false);
   state = 'menu';
   buildMenu();
-  showOverlay('menu');
+  if (currentDef && cardFor[currentDef.id]) ui.focusMem.lessons = cardFor[currentDef.id];
+  ui.setStack(stack, true);
+  audio.setPaused(false);
   audio.update(0, 0, false);
 }
 
@@ -145,12 +201,23 @@ function showResult() {
   const def = session.def;
   state = 'result';
   hud.show(false);
+  $('r-kicker').textContent = r.passed ? 'LESSON COMPLETE' : 'TRY AGAIN';
   $('r-badge').textContent = r.passed ? '🏆' : '🔁';
   $('r-title').textContent = r.passed ? `עברת את "${def.title}"!` : 'לא נורא, מנסים שוב';
-  $('r-stars').innerHTML = starsText(r.stars);
+  $('r-stars').innerHTML = [0, 1, 2].map((i) =>
+    `<span class="star${i < r.stars ? ' on' : ''}" style="animation-delay:${0.3 + i * 0.22}s">★</span>`).join('');
   const t = Math.floor(r.time);
-  const extra = r.stats.map(([k, v]) => `<span>${k}: <b>${v}</b></span>`).join('');
-  $('r-summary').innerHTML = `<span>ניקוד: <b>${r.score}</b></span><span>זמן: <b>${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}</b></span>${extra}`;
+  const stat = (label, value, id = '') => `<div class="stat"><small>${label}</small><b${id ? ` id="${id}"` : ''}>${value}</b></div>`;
+  $('r-summary').innerHTML = stat('ניקוד', 0, 'r-score') + stat('זמן', `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`)
+    + r.stats.map(([k, v]) => stat(k, v)).join('');
+  // score counts up
+  const scoreEl = $('r-score'), t0 = performance.now();
+  const countUp = (now) => {
+    const k = Math.min(1, (now - t0) / 900);
+    scoreEl.textContent = Math.round(r.score * (1 - (1 - k) ** 3));
+    if (k < 1) requestAnimationFrame(countUp);
+  };
+  requestAnimationFrame(countUp);
   const ul = $('r-mistakes');
   ul.innerHTML = r.mistakes.length
     ? r.mistakes.map((m) => `<li><span>${m.msg}${m.count > 1 ? ` ×${m.count}` : ''}</span><span class="pts" dir="ltr">−${m.pts}</span></li>`).join('')
@@ -171,48 +238,46 @@ function showResult() {
       store.set('moto.progress', progress);
     }
   }
-  showOverlay('result');
+  ui.show('result');
+  ui.sfx(r.passed ? 'win' : 'lose');
 }
 
+$('m-lessons').onclick = () => ui.push('lessons');
+$('m-free').onclick = () => openBriefing(FREE_RIDE);
+$('m-howto').onclick = () => ui.push('howto');
+$('m-settings').onclick = () => ui.openSettings();
+$('howto-back').onclick = () => ui.back();
+$('set-back').onclick = () => ui.back();
+$('set-defaults').onclick = async () => {
+  if (await ui.confirm('לשחזר את כל ההגדרות לברירת המחדל?')) ui.onAction('defaults');
+};
 $('b-start').onclick = () => startLesson(currentDef);
-$('b-back').onclick = toMenu;
+$('b-back').onclick = () => ui.back();
 $('p-resume').onclick = resume;
 $('p-restart').onclick = () => startLesson(currentDef);
-$('p-menu').onclick = toMenu;
-$('r-retry').onclick = () => startLesson(currentDef);
-$('r-menu').onclick = toMenu;
-
-const optAuto = $('opt-auto');
-const optSound = $('opt-sound');
-optAuto.checked = settings.auto;
-optSound.checked = settings.sound;
-optAuto.onchange = () => { settings.auto = optAuto.checked; store.set('moto.settings', settings); };
-optSound.onchange = () => { settings.sound = optSound.checked; audio.setEnabled(settings.sound); store.set('moto.settings', settings); };
-const optQuality = $('opt-quality');
-optQuality.innerHTML = Object.entries(QUALITY).map(([k, q]) => `<option value="${k}">${q.label}</option>`).join('');
-optQuality.value = gfx.qName;
-optQuality.onchange = () => {
-  settings.quality = optQuality.value;
-  store.set('moto.settings', settings);
-  location.reload();
+$('p-settings').onclick = () => ui.openSettings();
+$('p-menu').onclick = async () => {
+  if (await ui.confirm('לצאת לתפריט הראשי? ההתקדמות בשיעור הנוכחי תאבד.')) toMenu();
 };
+$('r-retry').onclick = () => startLesson(currentDef);
+$('r-menu').onclick = () => toMenu();
 
 // ---------- camera ----------
-function cameraTargets(outPos, outLook) {
+function cameraTargets(outPos, outLook, mode = camMode) {
   const fx = bike.fwdX, fz = bike.fwdZ;
-  if (camMode === 0) {
+  if (mode === 0) {
     const dist = 4.6 + bike.kmh * 0.025;
     outPos.set(bike.x - fx * dist, bike.y + 1.85 + bike.kmh * 0.006, bike.z - fz * dist);
     outLook.set(bike.x + fx * 5, bike.y + 1.05, bike.z + fz * 5);
-  } else if (camMode === 2) {
+  } else if (mode === 2) {
     outPos.set(bike.x - fx * 7, 24, bike.z - fz * 7);
     outLook.set(bike.x + fx * 3, 0, bike.z + fz * 3);
   }
 }
 
 function snapCamera() {
-  if (camMode === 1) camMode = 0;
-  cameraTargets(camPos, camLook);
+  // the rider view follows the head every frame; keep the chase camera ready behind it
+  cameraTargets(camPos, camLook, camMode === 1 ? 0 : camMode);
   camera.position.copy(camPos);
   camera.up.set(0, 1, 0);
   camera.lookAt(camLook);
@@ -223,7 +288,7 @@ const _q = new THREE.Quaternion();
 let shakeT = 0;
 function updateCamera(dt) {
   // a touch of speed feel: wider FOV when fast
-  const fov = 60 + Math.min(14, bike.kmh * 0.13);
+  const fov = settings.fov + Math.min(14, bike.kmh * 0.13);
   if (Math.abs(camera.fov - fov) > 0.05) {
     camera.fov += (fov - camera.fov) * Math.min(1, dt * 3);
     camera.updateProjectionMatrix();
@@ -245,7 +310,7 @@ function updateCamera(dt) {
   camera.position.copy(camPos);
   // subtle shake on rough ground / at speed
   shakeT += dt;
-  const rough = (bike.surface === 'grass' ? 0.03 : 0.004) * Math.min(1, bike.kmh / 30);
+  const rough = settings.shake ? (bike.surface === 'grass' ? 0.03 : 0.004) * Math.min(1, bike.kmh / 30) : 0;
   camera.position.x += Math.sin(shakeT * 31) * rough;
   camera.position.y += Math.sin(shakeT * 27 + 1) * rough;
   camera.up.set(0, 1, 0);
@@ -280,22 +345,22 @@ let blinkWasOn = false;
 
 function frame(now) {
   requestAnimationFrame(frame);
-  const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
+  const raw = Math.max(0, (now - last) / 1000);
+  const dt = Math.min(0.05, raw);
   last = Math.max(last, now);
+  hud.tickFps(raw);
   tick(dt, now);
   gfx.render(dt);
 }
 
 function tick(dt, now) {
-  // global keys
-  if (input.hit('Escape')) {
-    if (state === 'playing') pause();
-    else if (state === 'paused') resume();
-  }
+  // menus own the keyboard whenever one is up (Esc there means "back")
+  if (state !== 'playing') ui.handleKeys(input);
+  else if (input.hit('Escape')) pause();
   if (state === 'playing') {
     if (input.hit('KeyC')) { camMode = (camMode + 1) % 3; hud.toast(CAM_NAMES[camMode], 'info', 1200); }
     if (input.hit('KeyH')) hud.toggleKeys();
-    if (input.hit('KeyM')) { settings.sound = !settings.sound; optSound.checked = settings.sound; audio.setEnabled(settings.sound); store.set('moto.settings', settings); }
+    if (input.hit('KeyM')) { settings.sound = !settings.sound; saveSettings(); applySettings(); hud.toast(settings.sound ? 'קול: פועל' : 'קול: מושתק', 'info', 1200); }
     if (input.hit('KeyR')) { startLesson(currentDef); input.endFrame(); return; }
   }
 
@@ -343,13 +408,14 @@ const _bikePos = new THREE.Vector3();
 const NO_INPUT = { pressed: new Set(), down: (...c) => c.includes('KeyS') || c.includes('ShiftLeft'), hit: () => false, endFrame() {} };
 
 buildMenu();
-showOverlay('menu');
+applySettings();
+ui.show('splash');
 $('loading').classList.add('hidden');
 requestAnimationFrame(frame);
 
 // handy for debugging from the console: __moto.advance(2) simulates two seconds of play
 window.__moto = {
-  game, input, LESSONS, startLesson,
+  game, input, LESSONS, startLesson, ui,
   get session() { return session; },
   get state() { return state; },
   advance(seconds, dt = 1 / 60) {
