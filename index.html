@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>בית ספר לרכיבה</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <canvas id="c"></canvas>
+
+  <!-- In-game HUD -->
+  <div id="hud" class="hidden">
+    <div id="lesson-panel">
+      <div class="lp-head">
+        <span id="lp-num" class="badge"></span>
+        <h2 id="lp-title"></h2>
+      </div>
+      <ol id="lp-steps"></ol>
+      <div class="lp-foot">
+        <span>ניקוד <b id="lp-score">100</b></span>
+        <span>זמן <b id="lp-time">0:00</b></span>
+      </div>
+    </div>
+
+    <canvas id="minimap" width="180" height="180"></canvas>
+
+    <div id="toasts"></div>
+
+    <div id="dash">
+      <div class="dash-ind">
+        <span id="i-left" class="ind blink">◀</span>
+        <span id="i-engine" class="ind">מנוע</span>
+        <span id="i-neutral" class="ind neutral">N</span>
+        <span id="i-clutch" class="ind">מצמד</span>
+        <span id="i-right" class="ind blink">▶</span>
+      </div>
+      <div class="dash-main">
+        <div class="gear-box"><small>הילוך</small><div id="d-gear">N</div></div>
+        <div class="speed"><span id="d-speed">0</span><small>קמ"ש</small></div>
+      </div>
+      <div class="rpm"><div id="d-rpm" class="rpm-fill"></div><div class="rpm-red"></div></div>
+      <div class="rpm-scale"><span>0</span><span>2</span><span>4</span><span>6</span><span>8</span><span>10</span></div>
+      <div class="rpm-label">סל"ד × 1000</div>
+    </div>
+
+    <div id="keys-hint">
+      <div class="kh-title">מקשים <small>(H להסתרה)</small></div>
+      <div class="kh-row"><kbd>W</kbd><kbd>↑</kbd> גז</div>
+      <div class="kh-row"><kbd>S</kbd><kbd>↓</kbd> ברקס</div>
+      <div class="kh-row"><kbd>A</kbd><kbd>D</kbd> היגוי</div>
+      <div class="kh-row"><kbd>Shift</kbd> מצמד (להחזיק)</div>
+      <div class="kh-row"><kbd>E</kbd> הילוך למעלה &nbsp;<kbd>Q</kbd> למטה &nbsp;<kbd>N</kbd> ניוטרל</div>
+      <div class="kh-row"><kbd>I</kbd> התנעה / כיבוי</div>
+      <div class="kh-row"><kbd>Z</kbd> איתות שמאל &nbsp;<kbd>X</kbd> ימין</div>
+      <div class="kh-row"><kbd>B</kbd> הליכה אחורה (בעמידה, בניוטרל)</div>
+      <div class="kh-row"><kbd>C</kbd> מצלמה &nbsp;<kbd>M</kbd> קול &nbsp;<kbd>R</kbd> התחל מחדש</div>
+      <div class="kh-row"><kbd>Esc</kbd> השהיה</div>
+    </div>
+
+    <div id="touch">
+      <div class="t-left">
+        <button data-key="KeyA">◀</button>
+        <button data-key="KeyD">▶</button>
+      </div>
+      <div class="t-mid">
+        <button data-key="KeyI" class="small">התנעה</button>
+        <button data-key="KeyQ" class="small">הילוך ▼</button>
+        <button data-key="KeyE" class="small">הילוך ▲</button>
+        <button data-key="KeyZ" class="small">◀ איתות</button>
+        <button data-key="KeyX" class="small">איתות ▶</button>
+        <button data-key="KeyC" class="small">מצלמה</button>
+        <button data-key="Escape" class="small">⏸</button>
+      </div>
+      <div class="t-right">
+        <button data-key="ShiftLeft">מצמד</button>
+        <button data-key="KeyS">ברקס</button>
+        <button data-key="KeyW" class="gas">גז</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main menu -->
+  <div id="menu" class="overlay">
+    <div class="panel wide">
+      <div class="brand">
+        <div class="logo">🏍️</div>
+        <div>
+          <h1>בית ספר לרכיבה</h1>
+          <p class="sub">לומדים לרכוב על אופנוע — צעד אחר צעד, במגרש ובכביש</p>
+        </div>
+      </div>
+      <div id="lesson-grid" class="lesson-grid"></div>
+      <div class="settings">
+        <label class="toggle"><input type="checkbox" id="opt-auto"> <span>תיבת הילוכים אוטומטית (למתחילים מאוד)</span></label>
+        <label class="toggle"><input type="checkbox" id="opt-sound" checked> <span>קול מנוע</span></label>
+        <label class="toggle"><span>איכות גרפיקה</span> <select id="opt-quality"></select></label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lesson briefing -->
+  <div id="briefing" class="overlay hidden">
+    <div class="panel">
+      <div class="lp-head"><span id="b-num" class="badge"></span><h2 id="b-title"></h2></div>
+      <div id="b-intro" class="intro"></div>
+      <h3>טיפים של המורה</h3>
+      <ul id="b-tips" class="tips"></ul>
+      <div id="b-note" class="note hidden"></div>
+      <div class="btns">
+        <button id="b-start" class="primary">יאללה, מתחילים</button>
+        <button id="b-back">חזרה לתפריט</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pause -->
+  <div id="pause" class="overlay hidden">
+    <div class="panel narrow">
+      <h2>הפסקה</h2>
+      <div class="btns col">
+        <button id="p-resume" class="primary">המשך</button>
+        <button id="p-restart">התחל את השיעור מחדש</button>
+        <button id="p-menu">לתפריט הראשי</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Result -->
+  <div id="result" class="overlay hidden">
+    <div class="panel">
+      <div id="r-badge" class="r-badge"></div>
+      <h2 id="r-title"></h2>
+      <div id="r-stars" class="stars"></div>
+      <div id="r-summary" class="r-summary"></div>
+      <ul id="r-mistakes" class="mistakes"></ul>
+      <div id="r-tip" class="note hidden"></div>
+      <div class="btns">
+        <button id="r-next" class="primary">לשיעור הבא</button>
+        <button id="r-retry">נסה שוב</button>
+        <button id="r-menu">לתפריט</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="loading" class="overlay"><div class="spinner"></div><p>טוען את המגרש...</p></div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
