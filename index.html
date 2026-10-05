@@ -2,11 +2,18 @@
 <html lang="he" dir="rtl">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0618">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="בית ספר לרכיבה">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
   <title>בית ספר לרכיבה</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;800&family=Orbitron:wght@500;700;900&family=Rubik:wght@500;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
   <script type="importmap">
     {
@@ -35,6 +42,7 @@
     </div>
 
     <canvas id="minimap" width="180" height="180"></canvas>
+    <div id="fps" class="hidden"></div>
 
     <div id="toasts"></div>
 
@@ -66,95 +74,195 @@
       <div class="kh-row"><kbd>Z</kbd> איתות שמאל &nbsp;<kbd>X</kbd> ימין</div>
       <div class="kh-row"><kbd>B</kbd> הליכה אחורה (בעמידה, בניוטרל)</div>
       <div class="kh-row"><kbd>C</kbd> מצלמה &nbsp;<kbd>M</kbd> קול &nbsp;<kbd>R</kbd> התחל מחדש</div>
-      <div class="kh-row"><kbd>Esc</kbd> השהיה</div>
+      <div class="kh-row"><kbd>Esc</kbd> השהיה &nbsp;<kbd>F</kbd> מסך מלא</div>
     </div>
 
+    <!-- Touch controls (shown automatically on touch devices). Phones always use the automatic
+         gearbox, so it's just: left hand = steering + blinkers, right hand = throttle + brake. -->
     <div id="touch">
-      <div class="t-left">
-        <button data-key="KeyA">◀</button>
-        <button data-key="KeyD">▶</button>
+      <div class="t-icons">
+        <button data-key="Escape" class="icon" aria-label="השהיה">
+          <svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14" /></svg>
+        </button>
+        <button data-key="KeyC" class="icon" aria-label="מצלמה">
+          <svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></svg>
+        </button>
+        <button class="icon fs-btn" aria-label="מסך מלא">
+          <svg viewBox="0 0 24 24"><path class="fs-enter" d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /><path class="fs-exit" d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /></svg>
+        </button>
       </div>
-      <div class="t-mid">
-        <button data-key="KeyI" class="small">התנעה</button>
-        <button data-key="KeyQ" class="small">הילוך ▼</button>
-        <button data-key="KeyE" class="small">הילוך ▲</button>
-        <button data-key="KeyZ" class="small">◀ איתות</button>
-        <button data-key="KeyX" class="small">איתות ▶</button>
-        <button data-key="KeyC" class="small">מצלמה</button>
-        <button data-key="Escape" class="small">⏸</button>
+      <div class="t-cluster t-left">
+        <div class="t-row">
+          <button data-key="KeyZ" class="small">◀ איתות</button>
+          <button data-key="KeyX" class="small">איתות ▶</button>
+        </div>
+        <div class="steer-pad" data-dir="0"><span class="sp-l">◀</span><i></i><span class="sp-r">▶</span></div>
       </div>
-      <div class="t-right">
-        <button data-key="ShiftLeft">מצמד</button>
-        <button data-key="KeyS">ברקס</button>
-        <button data-key="KeyW" class="gas">גז</button>
+      <div class="t-cluster t-right">
+        <div class="t-row">
+          <button data-key="KeyS" class="round brake">ברקס</button>
+          <button data-key="KeyW" class="round gas">גז</button>
+        </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Synthwave floor behind the title / main menu -->
+  <div id="menu-bg" class="hidden"><div class="grid-floor"></div></div>
+
+  <!-- Title screen -->
+  <div id="splash" class="screen overlay hidden">
+    <div class="splash-wrap">
+      <div class="kicker">MOTO SCHOOL</div>
+      <h1 class="logo flicker">בית ספר לרכיבה</h1>
+      <p class="logo-sub">לומדים לרכוב על אופנוע — צעד אחר צעד, במגרש ובכביש</p>
+      <div class="press kbd-only">לחצו על מקש כלשהו</div>
+      <div class="press-en kbd-only">PRESS ANY KEY</div>
+      <div class="press touch-only">געו במסך כדי להתחיל</div>
+      <div class="press-en touch-only">TAP TO START</div>
     </div>
   </div>
 
   <!-- Main menu -->
-  <div id="menu" class="overlay">
-    <div class="panel wide">
-      <div class="brand">
-        <div class="logo">🏍️</div>
-        <div>
-          <h1>בית ספר לרכיבה</h1>
-          <p class="sub">לומדים לרכוב על אופנוע — צעד אחר צעד, במגרש ובכביש</p>
-        </div>
+  <div id="menu" class="screen overlay hidden">
+    <div class="menu-wrap">
+      <div class="logo-block">
+        <div class="kicker">MOTO SCHOOL</div>
+        <h1 class="logo">בית ספר<br>לרכיבה</h1>
       </div>
+      <nav class="menu-list">
+        <button class="mi" data-nav id="m-lessons"><span class="mi-label">שיעורים</span><small id="m-progress"></small></button>
+        <button class="mi" data-nav id="m-free"><span class="mi-label">רכיבה חופשית</span><small>בלי משימות ובלי ציונים</small></button>
+        <button class="mi" data-nav id="m-howto"><span class="mi-label">איך משחקים</span><small>מטרה, ניקוד ומקשים</small></button>
+        <button class="mi" data-nav id="m-settings"><span class="mi-label">הגדרות</span><small>גרפיקה, שמע ומשחק</small></button>
+      </nav>
+    </div>
+    <button class="corner-btn fs-btn" aria-label="מסך מלא">
+      <svg viewBox="0 0 24 24"><path class="fs-enter" d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /><path class="fs-exit" d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /></svg>
+      <span class="fs-enter">מסך מלא</span><span class="fs-exit">יציאה ממסך מלא</span>
+    </button>
+    <div class="version">v1.1</div>
+  </div>
+
+  <!-- Lesson select -->
+  <div id="lessons" class="screen overlay hidden">
+    <div class="screen-wrap">
+      <header class="screen-head">
+        <div><div class="kicker">SELECT LESSON</div><h2>בחירת שיעור</h2></div>
+        <div id="ls-stars" class="head-stat"></div>
+      </header>
       <div id="lesson-grid" class="lesson-grid"></div>
-      <div class="settings">
-        <label class="toggle"><input type="checkbox" id="opt-auto"> <span>תיבת הילוכים אוטומטית (למתחילים מאוד)</span></label>
-        <label class="toggle"><input type="checkbox" id="opt-sound" checked> <span>קול מנוע</span></label>
-        <label class="toggle"><span>איכות גרפיקה</span> <select id="opt-quality"></select></label>
+    </div>
+  </div>
+
+  <!-- Settings -->
+  <div id="settings" class="screen overlay hidden">
+    <div class="screen-wrap">
+      <header class="screen-head">
+        <div><div class="kicker">OPTIONS</div><h2>הגדרות</h2></div>
+      </header>
+      <div id="set-tabs" class="tabs"></div>
+      <div id="set-body" class="set-body"></div>
+      <div class="set-foot">
+        <button class="btn" data-nav id="set-defaults">שחזור ברירות מחדל</button>
+        <button class="btn" data-nav id="set-back">חזרה</button>
       </div>
     </div>
   </div>
 
+  <!-- How to play -->
+  <div id="howto" class="screen overlay hidden">
+    <div class="screen-wrap">
+      <header class="screen-head">
+        <div><div class="kicker">HOW TO PLAY</div><h2>איך משחקים</h2></div>
+      </header>
+      <div class="howto-cards">
+        <div class="hc"><b>01</b><span>בוחרים שיעור ומקשיבים לטיפים של המורה.</span></div>
+        <div class="hc"><b>02</b><span>מבצעים את המשימות שבפינת המסך, אחת אחרי השנייה.</span></div>
+        <div class="hc"><b>03</b><span>כל טעות מורידה נקודות. 85 ומעלה — שני כוכבים, 95 ומעלה — שלושה.</span></div>
+      </div>
+      <div id="howto-keys"></div>
+      <p class="ios-tip touch-only no-fs-only">באייפון: לחצו "שיתוף" ← "הוספה למסך הבית" כדי לשחק במסך מלא.</p>
+      <div class="btns"><button class="btn" data-nav id="howto-back">חזרה</button></div>
+    </div>
+  </div>
+
   <!-- Lesson briefing -->
-  <div id="briefing" class="overlay hidden">
+  <div id="briefing" class="screen overlay side hidden">
     <div class="panel">
+      <div class="kicker">BRIEFING</div>
       <div class="lp-head"><span id="b-num" class="badge"></span><h2 id="b-title"></h2></div>
       <div id="b-intro" class="intro"></div>
       <h3>טיפים של המורה</h3>
       <ul id="b-tips" class="tips"></ul>
       <div id="b-note" class="note hidden"></div>
       <div class="btns">
-        <button id="b-start" class="primary">יאללה, מתחילים</button>
-        <button id="b-back">חזרה לתפריט</button>
+        <button id="b-start" class="btn primary" data-nav>יאללה, מתחילים</button>
+        <button id="b-back" class="btn" data-nav>חזרה</button>
       </div>
     </div>
   </div>
 
   <!-- Pause -->
-  <div id="pause" class="overlay hidden">
-    <div class="panel narrow">
-      <h2>הפסקה</h2>
-      <div class="btns col">
-        <button id="p-resume" class="primary">המשך</button>
-        <button id="p-restart">התחל את השיעור מחדש</button>
-        <button id="p-menu">לתפריט הראשי</button>
-      </div>
+  <div id="pause" class="screen overlay hidden">
+    <div class="pause-wrap">
+      <div class="kicker">PAUSED</div>
+      <h2 class="big-title">הפסקה</h2>
+      <nav class="menu-list center">
+        <button class="mi" data-nav id="p-resume"><span class="mi-label">המשך</span></button>
+        <button class="mi" data-nav id="p-restart"><span class="mi-label">התחל את השיעור מחדש</span></button>
+        <button class="mi" data-nav id="p-settings"><span class="mi-label">הגדרות</span></button>
+        <button class="mi fs-btn" data-nav><span class="mi-label"><span class="fs-enter">מסך מלא</span><span class="fs-exit">יציאה ממסך מלא</span></span></button>
+        <button class="mi" data-nav id="p-menu"><span class="mi-label">לתפריט הראשי</span></button>
+      </nav>
     </div>
   </div>
 
   <!-- Result -->
-  <div id="result" class="overlay hidden">
-    <div class="panel">
+  <div id="result" class="screen overlay hidden">
+    <div class="panel result-panel">
+      <div id="r-kicker" class="kicker"></div>
       <div id="r-badge" class="r-badge"></div>
       <h2 id="r-title"></h2>
       <div id="r-stars" class="stars"></div>
       <div id="r-summary" class="r-summary"></div>
       <ul id="r-mistakes" class="mistakes"></ul>
       <div id="r-tip" class="note hidden"></div>
-      <div class="btns">
-        <button id="r-next" class="primary">לשיעור הבא</button>
-        <button id="r-retry">נסה שוב</button>
-        <button id="r-menu">לתפריט</button>
+      <div class="btns center">
+        <button id="r-next" class="btn primary" data-nav>לשיעור הבא</button>
+        <button id="r-retry" class="btn" data-nav>נסה שוב</button>
+        <button id="r-menu" class="btn" data-nav>לתפריט</button>
       </div>
     </div>
   </div>
 
-  <div id="loading" class="overlay"><div class="spinner"></div><p>טוען את המגרש...</p></div>
+  <!-- Confirm dialog -->
+  <div id="confirm" class="modal hidden">
+    <div class="panel">
+      <div class="kicker">CONFIRM</div>
+      <p id="cf-text"></p>
+      <div class="btns center">
+        <button id="cf-ok" class="btn" data-nav>אישור</button>
+        <button id="cf-cancel" class="btn" data-nav>ביטול</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="prompts" class="prompts hidden"></div>
+
+  <!-- Phones held upright during a lesson -->
+  <div id="rotate">
+    <div class="rot-phone"></div>
+    <p>סובבו את הטלפון לרוחב</p>
+    <small>הרכיבה נוחה הרבה יותר במצב אופקי</small>
+    <button class="btn" id="rot-anyway">להמשיך בכל זאת</button>
+  </div>
+
+  <div id="loading" class="overlay">
+    <div class="kicker">MOTO SCHOOL</div>
+    <div class="load-bar"><i></i></div>
+    <p>טוען את המגרש...</p>
+  </div>
 
   <script type="module" src="js/main.js"></script>
 </body>

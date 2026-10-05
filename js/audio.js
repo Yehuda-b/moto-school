@@ -2,7 +2,9 @@
 export class EngineAudio {
   constructor() {
     this.ctx = null;
-    this.enabled = true;
+    this.enabled = true; // engine + game effects (menu sounds play regardless)
+    this.paused = false;
+    this.volume = 1;
   }
 
   /** Must be called from a user gesture. */
@@ -12,8 +14,12 @@ export class EngineAudio {
     if (!AC) return;
     const ctx = (this.ctx = new AC());
     this.master = ctx.createGain();
-    this.master.gain.value = this.enabled ? 0.9 : 0;
+    this.master.gain.value = 0.9 * this.volume;
     this.master.connect(ctx.destination);
+    // the engine has its own bus so it can be muted (setting / pause) without silencing menu sounds
+    this.bus = ctx.createGain();
+    this.bus.gain.value = this.enabled && !this.paused ? 1 : 0;
+    this.bus.connect(this.master);
 
     this.filter = ctx.createBiquadFilter();
     this.filter.type = 'lowpass';
@@ -21,7 +27,7 @@ export class EngineAudio {
     this.filter.Q.value = 3;
     this.engineGain = ctx.createGain();
     this.engineGain.gain.value = 0;
-    this.filter.connect(this.engineGain).connect(this.master);
+    this.filter.connect(this.engineGain).connect(this.bus);
 
     this.osc1 = ctx.createOscillator();
     this.osc1.type = 'sawtooth';
@@ -47,13 +53,29 @@ export class EngineAudio {
     this.noiseFilter.frequency.value = 120;
     this.noiseGain = ctx.createGain();
     this.noiseGain.gain.value = 0;
-    this.noise.connect(this.noiseFilter).connect(this.noiseGain).connect(this.master);
+    this.noise.connect(this.noiseFilter).connect(this.noiseGain).connect(this.bus);
     this.noise.start();
   }
 
   setEnabled(on) {
     this.enabled = on;
-    if (this.master) this.master.gain.setTargetAtTime(on ? 0.9 : 0, this.ctx.currentTime, 0.05);
+    this.updateBus();
+  }
+
+  /** Silences the engine while the game is paused. */
+  setPaused(on) {
+    this.paused = on;
+    this.updateBus();
+  }
+
+  updateBus() {
+    if (this.bus) this.bus.gain.setTargetAtTime(this.enabled && !this.paused ? 1 : 0, this.ctx.currentTime, 0.05);
+  }
+
+  /** Master volume, 0..1. */
+  setVolume(v) {
+    this.volume = v;
+    if (this.master) this.master.gain.setTargetAtTime(0.9 * v, this.ctx.currentTime, 0.05);
   }
 
   resume() { this.ctx?.state === 'suspended' && this.ctx.resume(); }
@@ -72,8 +94,14 @@ export class EngineAudio {
     this.noiseGain.gain.setTargetAtTime(rpm > 50 ? 0.05 + throttle * 0.1 : 0, t, 0.06);
   }
 
+  /** Game sound effect: muted together with the engine. */
   blip(freq = 880, dur = 0.08, type = 'sine', vol = 0.15) {
-    if (!this.ctx || !this.enabled) return;
+    if (this.enabled) this.beep(freq, dur, type, vol);
+  }
+
+  /** Raw tone straight to the master (menu sounds). */
+  beep(freq, dur, type, vol) {
+    if (!this.ctx) return;
     const t = this.ctx.currentTime;
     const o = this.ctx.createOscillator();
     const g = this.ctx.createGain();

@@ -1,5 +1,6 @@
 import { LOT, RING, ROAD_HALF } from './world.js';
 import { REDLINE } from './bike.js';
+import { forDevice } from './device.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -9,16 +10,21 @@ export class HUD {
       hud: $('hud'), num: $('lp-num'), title: $('lp-title'), steps: $('lp-steps'), score: $('lp-score'), time: $('lp-time'),
       gear: $('d-gear'), speed: $('d-speed'), rpm: $('d-rpm'),
       left: $('i-left'), right: $('i-right'), engine: $('i-engine'), neutral: $('i-neutral'), clutch: $('i-clutch'),
-      toasts: $('toasts'), keys: $('keys-hint'), panel: $('lesson-panel'),
+      toasts: $('toasts'), keys: $('keys-hint'), panel: $('lesson-panel'), fps: $('fps'),
     };
     this.minimap = $('minimap');
+    this.minimapOn = true;
+    this.fpsOn = false;
     this.mctx = this.minimap.getContext('2d');
     this.mapImg = this.drawStaticMap(world);
     this.lastSteps = '';
     this.recentToasts = new Map();
   }
 
-  show(on) { this.el.hud.classList.toggle('hidden', !on); }
+  show(on) {
+    this.el.hud.classList.toggle('hidden', !on);
+    document.body.classList.toggle('in-game', on);
+  }
 
   setLesson(def) {
     this.el.num.textContent = def.free ? 'חופשי' : `שיעור ${def.num}`;
@@ -43,7 +49,7 @@ export class HUD {
     }
     steps.forEach((s, i) => {
       const li = document.createElement('li');
-      li.textContent = typeof s.text === 'function' ? s.text(session) : s.text;
+      li.textContent = forDevice(typeof s.text === 'function' ? s.text(session) : s.text);
       if (i < session.stepIdx) li.className = 'done';
       else if (i === session.stepIdx) li.className = 'current';
       this.el.steps.appendChild(li);
@@ -70,7 +76,7 @@ export class HUD {
       e.time.textContent = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
       this.renderSteps(session);
     }
-    this.drawMinimap(bike, session);
+    if (this.minimapOn) this.drawMinimap(bike, session);
   }
 
   toast(text, kind = 'info', ms = 2600, big = false) {
@@ -80,7 +86,7 @@ export class HUD {
     this.recentToasts.set(text, now);
     const d = document.createElement('div');
     d.className = `toast ${kind}${big ? ' big' : ''}`;
-    d.textContent = text;
+    d.textContent = forDevice(text);
     this.el.toasts.appendChild(d);
     while (this.el.toasts.children.length > 3) this.el.toasts.firstChild.remove();
     setTimeout(() => {
@@ -90,6 +96,31 @@ export class HUD {
   }
 
   toggleKeys() { this.el.keys.classList.toggle('hidden'); }
+  setKeys(on) { this.el.keys.classList.toggle('hidden', !on); }
+
+  setMinimap(on) {
+    this.minimapOn = on;
+    this.minimap.classList.toggle('hidden', !on);
+  }
+
+  setFps(on) {
+    this.fpsOn = on;
+    this.el.fps.classList.toggle('hidden', !on);
+    this.fpsT = 0;
+    this.fpsN = 0;
+  }
+
+  /** Frame counter, averaged over half a second. */
+  tickFps(dt) {
+    if (!this.fpsOn) return;
+    this.fpsT += dt;
+    this.fpsN++;
+    if (this.fpsT >= 0.5) {
+      this.el.fps.textContent = `${Math.round(this.fpsN / this.fpsT)} FPS`;
+      this.fpsT = 0;
+      this.fpsN = 0;
+    }
+  }
 
   // ---------- minimap ----------
   drawStaticMap(world) {
@@ -140,12 +171,13 @@ export class HUD {
       }
     }
     g.restore();
-    // the bike arrow in the center
+    // the bike arrow in the center (scaled up when the map is shown small, e.g. on phones)
+    const a = Math.max(1, (W / (this.minimap.clientWidth || W)) * 0.55);
     g.fillStyle = '#fff';
     g.strokeStyle = '#000';
-    g.lineWidth = 1.5;
+    g.lineWidth = 1.5 * a;
     g.beginPath();
-    g.moveTo(W / 2, W / 2 - 9); g.lineTo(W / 2 + 6, W / 2 + 7); g.lineTo(W / 2, W / 2 + 3); g.lineTo(W / 2 - 6, W / 2 + 7);
+    g.moveTo(W / 2, W / 2 - 9 * a); g.lineTo(W / 2 + 6 * a, W / 2 + 7 * a); g.lineTo(W / 2, W / 2 + 3 * a); g.lineTo(W / 2 - 6 * a, W / 2 + 7 * a);
     g.closePath(); g.fill(); g.stroke();
   }
 }

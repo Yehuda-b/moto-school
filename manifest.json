@@ -1,0 +1,14 @@
+{
+  "name": "בית ספר לרכיבה",
+  "short_name": "רכיבה",
+  "lang": "he",
+  "dir": "rtl",
+  "start_url": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0a0618",
+  "theme_color": "#0a0618",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
