@@ -11,6 +11,7 @@ import { NPCs } from './npc.js';
 import { Effects } from './effects.js';
 import { GrassField } from './grass.js';
 import { MenuUI, settingsTabs } from './ui.js';
+import { device, fullscreen, forDevice } from './device.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -24,8 +25,9 @@ const store = {
   },
 };
 const DEFAULTS = {
-  auto: false, sound: true, quality: 'high', volume: 80, uiSound: true,
+  auto: false, sound: true, quality: device.touch ? 'medium' : 'high', volume: 80, uiSound: true,
   fov: 60, shake: true, fps: false, camera: 0, minimap: true, keys: true,
+  touchSize: 100, haptics: true,
 };
 const settings = { ...DEFAULTS, ...store.get('moto.settings', {}) };
 const saveSettings = () => store.set('moto.settings', settings);
@@ -93,6 +95,8 @@ function applySettings() {
   hud.setMinimap(settings.minimap);
   hud.setKeys(settings.keys);
   hud.setFps(settings.fps);
+  input.haptics = settings.haptics;
+  document.documentElement.style.setProperty('--t', settings.touchSize / 100);
   ui.refresh();
 }
 
@@ -109,8 +113,9 @@ function buildMenu() {
     const best = progress[def.id];
     total += best?.stars || 0;
     const b = document.createElement('button');
-    b.className = 'lesson-card' + (best ? ' passed' : '');
-    b.dataset.nav = '';
+    const locked = lockedOnTouch(def);
+    b.className = 'lesson-card' + (best ? ' passed' : '') + (locked ? ' locked' : '');
+    if (!locked) b.dataset.nav = '';
     b.innerHTML = `
       <span class="lc-num">${String(def.num).padStart(2, '0')}</span>
       <span class="lc-body">
@@ -119,9 +124,9 @@ function buildMenu() {
       </span>
       <span class="lc-foot">
         <span class="lc-stars">${starsText(best?.stars || 0)}</span>
-        <span class="lc-best">${best ? `שיא <b>${best.score}</b>` : 'טרם הושלם'}</span>
+        <span class="lc-best">${locked ? 'מצמד והילוכים — במחשב בלבד' : best ? `שיא <b>${best.score}</b>` : 'טרם הושלם'}</span>
       </span>`;
-    b.onclick = () => openBriefing(def);
+    if (!locked) b.onclick = () => openBriefing(def);
     grid.appendChild(b);
     cardFor[def.id] = b;
   }
@@ -136,10 +141,10 @@ function openBriefing(def) {
   state = 'briefing';
   $('b-num').textContent = def.free ? 'חופשי' : `שיעור ${def.num}`;
   $('b-title').textContent = def.title;
-  $('b-intro').innerHTML = def.intro;
-  $('b-tips').innerHTML = def.tips.map((t) => `<li>${t}</li>`).join('');
+  $('b-intro').innerHTML = forDevice(def.intro);
+  $('b-tips').innerHTML = def.tips.map(forDevice).filter(Boolean).map((t) => `<li>${t}</li>`).join('');
   const note = $('b-note');
-  if (def.manualOnly && settings.auto) {
+  if (def.manualOnly && settings.auto && !device.touch) {
     note.textContent = 'שיעור זה מלמד עבודה עם מצמד והילוכים, ולכן ייערך עם תיבה ידנית.';
     note.classList.remove('hidden');
   } else note.classList.add('hidden');
@@ -168,9 +173,13 @@ function startLesson(def) {
   if (!def.free) hud.toast(def.title, 'info', 2200, true);
 }
 
+// phones always ride with the automatic gearbox (no clutch / gear buttons taking up the screen)
 function isAuto() {
-  return settings.auto && !currentDef?.manualOnly;
+  return device.touch || (settings.auto && !currentDef?.manualOnly);
 }
+
+/** Clutch & gear lessons need a keyboard. */
+const lockedOnTouch = (def) => device.touch && def.manualOnly;
 
 function pause() {
   if (state !== 'playing') return;
@@ -226,7 +235,7 @@ function showResult() {
   if (r.failMsg) { tip.textContent = r.failMsg; tip.classList.remove('hidden'); } else tip.classList.add('hidden');
 
   const idx = LESSONS.indexOf(def);
-  const next = LESSONS[idx + 1];
+  const next = LESSONS.slice(idx + 1).find((d) => !lockedOnTouch(d));
   $('r-next').classList.toggle('hidden', !(r.passed && next));
   $('r-next').onclick = () => openBriefing(next);
   $('r-retry').classList.toggle('primary', !r.passed);
@@ -261,6 +270,22 @@ $('p-menu').onclick = async () => {
 };
 $('r-retry').onclick = () => startLesson(currentDef);
 $('r-menu').onclick = () => toMenu();
+
+// ---------- fullscreen ----------
+for (const b of document.querySelectorAll('.fs-btn')) b.addEventListener('click', () => fullscreen.toggle());
+addEventListener('keydown', (e) => { if (e.code === 'KeyF' && !e.repeat) fullscreen.toggle(); });
+
+// ---------- phones ----------
+// re-word the lesson steps when switching between touch and keyboard
+device.onChange(() => {
+  hud.lastSteps = '';
+  if (state === 'menu') buildMenu();
+});
+// a phone turned upright mid-lesson pauses; the rotate prompt covers the screen until it's turned back
+addEventListener('resize', () => {
+  if (device.touch && device.portrait && state === 'playing' && !document.body.classList.contains('allow-portrait')) pause();
+});
+$('rot-anyway').onclick = () => document.body.classList.add('allow-portrait');
 
 // ---------- camera ----------
 function cameraTargets(outPos, outLook, mode = camMode) {

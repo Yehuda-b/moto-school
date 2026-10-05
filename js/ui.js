@@ -20,6 +20,15 @@ export const KEYS_HELP = [
   [['R'], 'התחלת השיעור מחדש'],
   [['H'], 'הסתרת המקשים'],
   [['Esc'], 'השהיה'],
+  [['F'], 'מסך מלא'],
+];
+
+export const TOUCH_HELP = [
+  [['◀ ▶'], 'היגוי — מחליקים את האגודל על המשטח, שמאל למטה'],
+  [['◀ איתות', 'איתות ▶'], 'איתותים — מעל ההיגוי'],
+  [['גז', 'ברקס'], 'ימין למטה. הגז גם מתניע את המנוע'],
+  [['AUTO'], 'בטלפון ההילוכים אוטומטיים — אין מצמד'],
+  [['II', 'מצלמה', 'מסך מלא'], 'הכפתורים ליד המפה'],
 ];
 
 /** The settings screen, tab by tab. `key` is the field in the settings object. */
@@ -38,14 +47,17 @@ export function settingsTabs(qualityOptions) {
       { key: 'uiSound', type: 'toggle', label: 'צלילי תפריט' },
     ] },
     { label: 'משחק', items: [
-      { key: 'auto', type: 'toggle', label: 'תיבת הילוכים אוטומטית', hint: 'למתחילים מאוד. שיעורי המצמד וההילוכים תמיד ידניים' },
+      { key: 'auto', type: 'toggle', label: 'תיבת הילוכים אוטומטית', hint: 'למתחילים מאוד. שיעורי המצמד וההילוכים תמיד ידניים', kbdOnly: true },
       { key: 'camera', type: 'choice', label: 'מצלמת ברירת מחדל', options: [[0, 'מאחור'], [1, 'מבט רוכב'], [2, 'מלמעלה']] },
       { key: 'minimap', type: 'toggle', label: 'מפה קטנה' },
       { key: 'keys', type: 'toggle', label: 'הצגת מקשים בזמן רכיבה' },
       { key: 'resetProgress', type: 'action', label: 'איפוס התקדמות', hint: 'מחיקת כל הכוכבים והשיאים', button: 'איפוס', danger: true,
         confirm: 'כל הכוכבים והשיאים יימחקו. להמשיך?' },
     ] },
-    { label: 'שליטה', keys: true },
+    { label: 'שליטה', keys: true, items: [
+      { key: 'touchSize', type: 'slider', label: 'גודל כפתורי מגע', min: 70, max: 140, step: 5, unit: '%', touchOnly: true },
+      { key: 'haptics', type: 'toggle', label: 'רטט בלחיצה', hint: 'בטלפונים שתומכים בזה', touchOnly: true },
+    ] },
   ];
 }
 
@@ -82,7 +94,7 @@ export class MenuUI {
     this.tabIdx = 0;
 
     this.buildSettings();
-    $('howto-keys').appendChild(this.keysGrid());
+    $('howto-keys').append(this.keysGrid(), this.keysGrid(TOUCH_HELP));
     $('cf-ok').onclick = () => this.closeModal(true);
     $('cf-cancel').onclick = () => this.closeModal(false);
     $('splash').addEventListener('click', () => this.leaveSplash());
@@ -231,8 +243,8 @@ export class MenuUI {
     for (const t of this.tabs) {
       const pane = document.createElement('div');
       pane.className = 'set-pane';
-      if (t.keys) pane.appendChild(this.keysGrid());
-      else for (const it of t.items) pane.appendChild(this.buildRow(it));
+      for (const it of t.items || []) pane.appendChild(this.buildRow(it));
+      if (t.keys) pane.append(this.keysGrid(), this.keysGrid(TOUCH_HELP));
       body.appendChild(pane);
     }
     this.selectTab(0, true);
@@ -241,7 +253,7 @@ export class MenuUI {
 
   buildRow(it) {
     const row = document.createElement('div');
-    row.className = 'set-row' + (it.danger ? ' danger' : '');
+    row.className = 'set-row' + (it.danger ? ' danger' : '') + (it.touchOnly ? ' touch-only' : '') + (it.kbdOnly ? ' kbd-only' : '');
     row.dataset.nav = '';
     row.dataset.key = it.key;
     if (it.type !== 'action') row.dataset.adjust = it.type;
@@ -268,10 +280,10 @@ export class MenuUI {
     return row;
   }
 
-  keysGrid() {
+  keysGrid(list = KEYS_HELP) {
     const g = document.createElement('div');
-    g.className = 'keys-grid';
-    g.innerHTML = KEYS_HELP.map(([keys, label]) =>
+    g.className = 'keys-grid ' + (list === KEYS_HELP ? 'kbd-only' : 'touch-only touch-help');
+    g.innerHTML = list.map(([keys, label]) =>
       `<div class="key-row"><span class="key-caps">${keys.map((k) => `<kbd>${k}</kbd>`).join('')}</span><span>${label}</span></div>`).join('');
     return g;
   }

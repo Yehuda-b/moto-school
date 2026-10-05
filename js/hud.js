@@ -1,5 +1,6 @@
 import { LOT, RING, ROAD_HALF } from './world.js';
 import { REDLINE } from './bike.js';
+import { forDevice } from './device.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -20,7 +21,10 @@ export class HUD {
     this.recentToasts = new Map();
   }
 
-  show(on) { this.el.hud.classList.toggle('hidden', !on); }
+  show(on) {
+    this.el.hud.classList.toggle('hidden', !on);
+    document.body.classList.toggle('in-game', on);
+  }
 
   setLesson(def) {
     this.el.num.textContent = def.free ? 'חופשי' : `שיעור ${def.num}`;
@@ -45,7 +49,7 @@ export class HUD {
     }
     steps.forEach((s, i) => {
       const li = document.createElement('li');
-      li.textContent = typeof s.text === 'function' ? s.text(session) : s.text;
+      li.textContent = forDevice(typeof s.text === 'function' ? s.text(session) : s.text);
       if (i < session.stepIdx) li.className = 'done';
       else if (i === session.stepIdx) li.className = 'current';
       this.el.steps.appendChild(li);
@@ -82,7 +86,7 @@ export class HUD {
     this.recentToasts.set(text, now);
     const d = document.createElement('div');
     d.className = `toast ${kind}${big ? ' big' : ''}`;
-    d.textContent = text;
+    d.textContent = forDevice(text);
     this.el.toasts.appendChild(d);
     while (this.el.toasts.children.length > 3) this.el.toasts.firstChild.remove();
     setTimeout(() => {
@@ -167,12 +171,13 @@ export class HUD {
       }
     }
     g.restore();
-    // the bike arrow in the center
+    // the bike arrow in the center (scaled up when the map is shown small, e.g. on phones)
+    const a = Math.max(1, (W / (this.minimap.clientWidth || W)) * 0.55);
     g.fillStyle = '#fff';
     g.strokeStyle = '#000';
-    g.lineWidth = 1.5;
+    g.lineWidth = 1.5 * a;
     g.beginPath();
-    g.moveTo(W / 2, W / 2 - 9); g.lineTo(W / 2 + 6, W / 2 + 7); g.lineTo(W / 2, W / 2 + 3); g.lineTo(W / 2 - 6, W / 2 + 7);
+    g.moveTo(W / 2, W / 2 - 9 * a); g.lineTo(W / 2 + 6 * a, W / 2 + 7 * a); g.lineTo(W / 2, W / 2 + 3 * a); g.lineTo(W / 2 - 6 * a, W / 2 + 7 * a);
     g.closePath(); g.fill(); g.stroke();
   }
 }

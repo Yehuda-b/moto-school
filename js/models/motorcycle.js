@@ -161,7 +161,8 @@ export function createMotorcycle(opts = {}) {
   screen.rotation.x = -0.45;
   screen.castShadow = false;
   screen.userData.dynamic = true;
-  for (const [i, sx] of [[0, -1], [1, 1]]) {
+  // the bike faces +z, so the rider's left is +x: blinkMats[0] (left) goes on +x
+  for (const [i, sx] of [[0, 1], [1, -1]]) {
     const b = add(new RoundedBoxGeometry(0.06, 0.035, 0.05, 2, 0.01), blinkMats[i], sx * 0.15, 0.86, 0.0, steerBody);
     b.userData.dynamic = true;
   }
@@ -189,7 +190,7 @@ export function createMotorcycle(opts = {}) {
   tl.rotation.y = Math.PI / 2;
   const tlight = add(new RoundedBoxGeometry(0.14, 0.05, 0.03, 2, 0.01), tailMat, 0, 0.93, -1.0);
   tlight.userData.dynamic = true;
-  for (const [i, sx] of [[0, -1], [1, 1]]) {
+  for (const [i, sx] of [[0, 1], [1, -1]]) {
     const b = add(new RoundedBoxGeometry(0.05, 0.035, 0.05, 2, 0.01), blinkMats[i], sx * 0.12, 0.86, -0.98);
     b.userData.dynamic = true;
     addGeo(tubeGeo(0.008, V(sx * 0.03, 0.86, -0.95), V(sx * 0.1, 0.86, -0.98)), S.black);
